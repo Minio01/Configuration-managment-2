@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <package>requests</package>
+    <repository>https://pypi.org/pypi</repository>
+    <test_mode>false</test_mode>
+    <output_image>graph.svg</output_image>
+    <ascii_tree>true</ascii_tree>
+    <filter_substring></filter_substring>
+</config>
