@@ -4,12 +4,15 @@ import argparse
 import sys
 
 from config import ConfigError, load_config
+from graph import GraphError, build_graph
 from pypi import RepositoryError, get_dependencies
+from testrepo import TestRepositoryError, load_repository
 
 DEFAULT_CONFIG = "config.xml"
 EXIT_OK = 0
 EXIT_CONFIG_ERROR = 2
 EXIT_REPOSITORY_ERROR = 3
+EXIT_GRAPH_ERROR = 4
 
 
 def parse_args(argv):
@@ -26,14 +29,36 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
-def print_direct_dependencies(config):
-    """Вывести прямые зависимости пакета, заданного в конфигурации."""
-    dependencies = get_dependencies(config.repository, config.package)
-    print(f"Прямые зависимости пакета {config.package}:")
-    if not dependencies:
-        print("  (нет зависимостей)")
-    for name in dependencies:
-        print(f"  {name}")
+def make_source(config):
+    """Вернуть функцию, выдающую прямые зависимости пакета."""
+    if config.test_mode:
+        repository = load_repository(config.repository)
+        if config.package not in repository:
+            raise TestRepositoryError(
+                f"пакет {config.package} не описан в тестовом репозитории"
+            )
+        return lambda name: repository.get(name, [])
+    return lambda name: get_dependencies(config.repository, name)
+
+
+def print_graph(graph):
+    """Вывести граф зависимостей в виде списка смежности."""
+    print(f"Граф зависимостей пакета {graph.root} "
+          f"(пакетов: {len(graph.edges)}):")
+    for name in graph.nodes():
+        deps = ", ".join(graph.dependencies(name)) or "(нет)"
+        print(f"  {name} -> {deps}")
+    if graph.cycles:
+        print("Циклические зависимости:")
+        for cycle in graph.cycles:
+            print("  " + " -> ".join(cycle))
+
+
+def run(config):
+    """Построить граф по конфигурации и вывести результат."""
+    source = make_source(config)
+    graph = build_graph(config.package, source, config.filter_substring)
+    print_graph(graph)
 
 
 def main(argv=None):
@@ -44,14 +69,14 @@ def main(argv=None):
     except ConfigError as exc:
         print(f"Ошибка конфигурации: {exc}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
-    if config.test_mode:
-        print("Тестовый режим пока не поддерживается", file=sys.stderr)
-        return EXIT_CONFIG_ERROR
     try:
-        print_direct_dependencies(config)
-    except RepositoryError as exc:
+        run(config)
+    except (RepositoryError, TestRepositoryError) as exc:
         print(f"Ошибка репозитория: {exc}", file=sys.stderr)
         return EXIT_REPOSITORY_ERROR
+    except GraphError as exc:
+        print(f"Ошибка анализа: {exc}", file=sys.stderr)
+        return EXIT_GRAPH_ERROR
     return EXIT_OK
 
 

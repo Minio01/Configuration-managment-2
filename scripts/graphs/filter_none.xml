@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <package>A</package>
+    <repository>../../repos/filter.txt</repository>
+    <test_mode>true</test_mode>
+    <output_image>filter_none.svg</output_image>
+    <ascii_tree>true</ascii_tree>
+    <filter_substring></filter_substring>
+</config>
