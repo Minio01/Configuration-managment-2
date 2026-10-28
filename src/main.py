@@ -4,10 +4,12 @@ import argparse
 import sys
 
 from config import ConfigError, load_config
+from pypi import RepositoryError, get_dependencies
 
 DEFAULT_CONFIG = "config.xml"
 EXIT_OK = 0
 EXIT_CONFIG_ERROR = 2
+EXIT_REPOSITORY_ERROR = 3
 
 
 def parse_args(argv):
@@ -24,11 +26,14 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
-def format_value(value):
-    """Представить значение параметра в виде строки для вывода."""
-    if isinstance(value, bool):
-        return str(value).lower()
-    return str(value)
+def print_direct_dependencies(config):
+    """Вывести прямые зависимости пакета, заданного в конфигурации."""
+    dependencies = get_dependencies(config.repository, config.package)
+    print(f"Прямые зависимости пакета {config.package}:")
+    if not dependencies:
+        print("  (нет зависимостей)")
+    for name in dependencies:
+        print(f"  {name}")
 
 
 def main(argv=None):
@@ -39,8 +44,14 @@ def main(argv=None):
     except ConfigError as exc:
         print(f"Ошибка конфигурации: {exc}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
-    for key, value in config.items():
-        print(f"{key}={format_value(value)}")
+    if config.test_mode:
+        print("Тестовый режим пока не поддерживается", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+    try:
+        print_direct_dependencies(config)
+    except RepositoryError as exc:
+        print(f"Ошибка репозитория: {exc}", file=sys.stderr)
+        return EXIT_REPOSITORY_ERROR
     return EXIT_OK
 
 

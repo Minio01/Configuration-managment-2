@@ -4,9 +4,9 @@ CLI-приложение на Python для анализа зависимост�
 Готовые менеджеры пакетов и библиотеки для получения зависимостей не
 используются, только стандартная библиотека Python.
 
-Текущий этап: **1 — минимальный прототип с конфигурацией**. Приложение
-читает параметры из XML-файла, проверяет их и выводит в формате
-`ключ=значение`.
+Текущий этап: **2 — сбор данных**. Приложение читает параметры из
+XML-файла и выводит прямые зависимости заданного пакета, полученные из
+репозитория PyPI по его JSON API (`<repository>/<package>/json`).
 
 ## Требования
 
@@ -18,9 +18,11 @@ CLI-приложение на Python для анализа зависимост�
 ```
 src/main.py        точка входа CLI
 src/config.py      чтение и проверка XML-конфигурации
+src/pypi.py        получение прямых зависимостей из PyPI
 tests/             модульные тесты (unittest)
 repos/             тестовые репозитории
 scripts/errors/    конфигурации с ошибками для демонстрации
+scripts/examples/  конфигурации для других пакетов и ошибок репозитория
 config.xml         пример конфигурации для PyPI
 config_test.xml    пример конфигурации для тестового репозитория
 run.bat            запуск приложения и тестов
@@ -65,6 +67,22 @@ run.bat            запуск приложения и тестов
 
 Примеры для каждого случая лежат в `scripts/errors/`.
 
+Ошибки репозитория (пакет не найден, нет соединения, некорректный JSON)
+выводятся как `Ошибка репозитория: ...`, код завершения `3`.
+
+## Получение зависимостей
+
+1. Загружается `<repository>/<package>/json` (последняя версия пакета).
+2. Из поля `info.requires_dist` берутся строки формата PEP 508.
+3. Зависимости, нужные только для extras (маркер `extra == "..."`),
+   отбрасываются — pip не устанавливает их без явного указания extra.
+4. Имя приводится к каноническому виду PEP 503 (`Charset_Normalizer` →
+   `charset-normalizer`), повторы удаляются.
+
+Маркеры окружения (`python_version < "3.10"` и т.п.) не вычисляются:
+такие зависимости показываются всегда, поэтому список может быть шире,
+чем то, что pip поставит на конкретной версии Python.
+
 ## Функции
 
 `src/config.py`:
@@ -78,10 +96,19 @@ run.bat            запуск приложения и тестов
 - `check_output_image(value, base_dir)` — проверить имя файла изображения;
 - `Config.items()` — параметры в виде пар ключ-значение.
 
+`src/pypi.py`:
+
+- `get_dependencies(repository, package)` — прямые зависимости пакета;
+- `fetch_metadata(repository, package)` — загрузить JSON-описание;
+- `parse_dependencies(metadata)` — список зависимостей из JSON;
+- `parse_requirement(line)` — имя пакета из строки Requires-Dist;
+- `normalize_name(name)` — каноническое имя (PEP 503);
+- `package_url(repository, package)` — URL JSON-описания.
+
 `src/main.py`:
 
 - `parse_args(argv)` — аргументы командной строки;
-- `format_value(value)` — форматирование значения для вывода;
+- `print_direct_dependencies(config)` — вывод прямых зависимостей;
 - `main(argv)` — запуск приложения, возвращает код завершения.
 
 ## Сборка и запуск
@@ -92,7 +119,8 @@ run.bat            запуск приложения и тестов
 run.bat                     :: запуск с config.xml
 run.bat config_test.xml     :: запуск с другой конфигурацией
 run.bat test                :: запуск тестов
-scripts\test_config.bat     :: демонстрация обработки ошибок
+scripts\test_config.bat     :: демонстрация ошибок конфигурации
+scripts\test_deps.bat       :: прямые зависимости нескольких пакетов
 ```
 
 Без `run.bat`:
@@ -106,16 +134,25 @@ python -m unittest discover -s tests -t . -v
 
 ```
 > run.bat config.xml
-package=requests
-repository=https://pypi.org/pypi
-test_mode=false
-output_image=C:\...\Pr_2\graph.svg
-ascii_tree=true
-filter_substring=
+Прямые зависимости пакета requests:
+  charset-normalizer
+  idna
+  urllib3
+  certifi
+
+> run.bat scripts\examples\flask.xml
+Прямые зависимости пакета flask:
+  blinker
+  click
+  importlib-metadata
+  itsdangerous
+  jinja2
+  markupsafe
+  werkzeug
+
+> run.bat scripts\examples\no-such-package-xyz.xml
+Ошибка репозитория: пакет 'no-such-package-xyz' не найден
 
 > run.bat scripts\errors\bad_test_mode.xml
 Ошибка конфигурации: параметр <test_mode> должен быть true или false, получено 'maybe'
-
-> run.bat scripts\errors\bad_output_image.xml
-Ошибка конфигурации: файл изображения должен иметь расширение .svg, получено 'graph.png'
 ```

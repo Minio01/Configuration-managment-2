@@ -3,9 +3,11 @@
 import contextlib
 import io
 import unittest
+from unittest import mock
 
 from tests import ROOT
 import main
+from pypi import RepositoryError
 
 
 def run_main(*args):
@@ -17,17 +19,31 @@ def run_main(*args):
 
 
 class MainTest(unittest.TestCase):
-    """Проверка вывода параметров и кодов завершения."""
+    """Проверка вывода прямых зависимостей и кодов завершения."""
 
-    def test_prints_all_parameters(self):
+    @mock.patch("main.get_dependencies")
+    def test_prints_direct_dependencies(self, get_dependencies):
+        get_dependencies.return_value = ["idna", "certifi"]
         code, out, _ = run_main(ROOT / "config.xml")
         self.assertEqual(code, main.EXIT_OK)
-        self.assertIn("package=requests", out)
-        self.assertIn("repository=https://pypi.org/pypi", out)
-        self.assertIn("test_mode=false", out)
-        self.assertIn("ascii_tree=true", out)
-        self.assertIn("filter_substring=", out)
-        self.assertIn("output_image=", out)
+        get_dependencies.assert_called_once_with(
+            "https://pypi.org/pypi", "requests"
+        )
+        self.assertIn("Прямые зависимости пакета requests", out)
+        self.assertIn("  idna\n  certifi\n", out)
+
+    @mock.patch("main.get_dependencies")
+    def test_no_dependencies(self, get_dependencies):
+        get_dependencies.return_value = []
+        _, out, _ = run_main(ROOT / "config.xml")
+        self.assertIn("нет зависимостей", out)
+
+    @mock.patch("main.get_dependencies")
+    def test_repository_error(self, get_dependencies):
+        get_dependencies.side_effect = RepositoryError("пакет не найден")
+        code, _, err = run_main(ROOT / "config.xml")
+        self.assertEqual(code, main.EXIT_REPOSITORY_ERROR)
+        self.assertIn("Ошибка репозитория", err)
 
     def test_config_error(self):
         code, out, err = run_main(ROOT / "scripts/errors/bad_test_mode.xml")
