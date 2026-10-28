@@ -22,6 +22,24 @@ class DependencyGraph:
         """Вернуть прямые зависимости пакета."""
         return self.edges.get(name, [])
 
+    def load_order(self):
+        """Вернуть порядок загрузки: зависимости раньше зависящих от них.
+
+        Порядок строится обратным (post-order) рекурсивным DFS от корня.
+        Если в графе есть цикл, он разрывается на ребре, ведущем назад.
+        """
+        order = []
+        self.add_to_order(self.root, set(), order)
+        return order
+
+    def add_to_order(self, name, visited, order):
+        """Добавить в order зависимости пакета, а затем сам пакет."""
+        visited.add(name)
+        for dep in self.dependencies(name):
+            if dep not in visited:
+                self.add_to_order(dep, visited, order)
+        order.append(name)
+
 
 def is_excluded(name, substring):
     """Проверить, исключается ли пакет фильтром по подстроке."""

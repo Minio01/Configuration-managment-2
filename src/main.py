@@ -54,11 +54,23 @@ def print_graph(graph):
             print("  " + " -> ".join(cycle))
 
 
+def print_load_order(graph):
+    """Вывести порядок загрузки зависимостей пакета."""
+    print(f"Порядок загрузки зависимостей пакета {graph.root}:")
+    for number, name in enumerate(graph.load_order(), start=1):
+        print(f"  {number}. {name}")
+    if graph.cycles:
+        print("Внимание: из-за циклов часть пакетов загружается раньше "
+              "своих зависимостей")
+
+
 def run(config):
     """Построить граф по конфигурации и вывести результат."""
     source = make_source(config)
     graph = build_graph(config.package, source, config.filter_substring)
     print_graph(graph)
+    print()
+    print_load_order(graph)
 
 
 def main(argv=None):

@@ -65,5 +65,43 @@ class BuildGraphTest(unittest.TestCase):
             build_graph("A", source("A: B"), "A")
 
 
+class LoadOrderTest(unittest.TestCase):
+    """Порядок загрузки зависимостей."""
+
+    def assert_before(self, order, first, second):
+        """Проверить, что пакет first загружается раньше second."""
+        self.assertLess(order.index(first), order.index(second))
+
+    def test_chain(self):
+        graph = build_graph("A", source("A: B\nB: C\nC:"))
+        self.assertEqual(graph.load_order(), ["C", "B", "A"])
+
+    def test_diamond(self):
+        graph = build_graph("A", source("A: B C\nB: D\nC: D\nD:"))
+        order = graph.load_order()
+        self.assertEqual(order, ["D", "B", "C", "A"])
+
+    def test_dependencies_first(self):
+        text = "A: B C\nB: D E\nC: E F\nD: F\nE:\nF:"
+        graph = build_graph("A", source(text))
+        order = graph.load_order()
+        self.assertEqual(sorted(order), ["A", "B", "C", "D", "E", "F"])
+        for name in order:
+            for dep in graph.dependencies(name):
+                self.assert_before(order, dep, name)
+
+    def test_cycle_each_package_once(self):
+        graph = build_graph("A", source("A: B\nB: C\nC: A D\nD:"))
+        self.assertEqual(graph.load_order(), ["D", "C", "B", "A"])
+
+    def test_single_package(self):
+        graph = build_graph("A", source("A:"))
+        self.assertEqual(graph.load_order(), ["A"])
+
+    def test_filtered_not_loaded(self):
+        graph = build_graph("A", source("A: B C\nB:\nC:"), "C")
+        self.assertEqual(graph.load_order(), ["B", "A"])
+
+
 if __name__ == "__main__":
     unittest.main()

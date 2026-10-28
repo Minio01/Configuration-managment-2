@@ -33,6 +33,12 @@ class TestModeTest(unittest.TestCase):
         _, out, _ = run_main(GRAPHS / "cycle.xml")
         self.assertIn("Циклические зависимости", out)
         self.assertIn("A -> B -> C -> A", out)
+        self.assertIn("Внимание", out)
+
+    def test_load_order(self):
+        _, out, _ = run_main(GRAPHS / "simple.xml")
+        self.assertIn("Порядок загрузки зависимостей пакета A", out)
+        self.assertIn("  1. D\n  2. B\n  3. C\n  4. A\n", out)
 
     def test_filter(self):
         _, out, _ = run_main(GRAPHS / "filter_b.xml")
