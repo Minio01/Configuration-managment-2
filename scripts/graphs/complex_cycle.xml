@@ -3,7 +3,7 @@
     <package>A</package>
     <repository>../../repos/complex_cycle.txt</repository>
     <test_mode>true</test_mode>
-    <output_image>complex_cycle.svg</output_image>
+    <output_image>../../docs/test_cycle.svg</output_image>
     <ascii_tree>true</ascii_tree>
     <filter_substring></filter_substring>
 </config>

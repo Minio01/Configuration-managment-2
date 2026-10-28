@@ -4,10 +4,20 @@ CLI-приложение на Python для анализа зависимост�
 Готовые менеджеры пакетов и библиотеки для получения зависимостей не
 используются, только стандартная библиотека Python.
 
-Текущий этап: **4 — дополнительные операции**. Приложение строит граф
+Текущий этап: **5 — визуализация**. Приложение строит граф
 транзитивных зависимостей пакета рекурсивным обходом в глубину (DFS),
-пропускает пакеты по подстроке, находит циклы, работает с PyPI и с
-тестовым репозиторием из файла и выводит порядок загрузки зависимостей.
+пропускает пакеты по подстроке, находит циклы и работает как с PyPI,
+так и с тестовым репозиторием из файла. Граф выводится на языке
+диаграмм Mermaid, сохраняется в SVG и, если задан параметр,
+печатается в виде ASCII-дерева.
+
+| Этап | Ветка | Что добавлено |
+|---|---|---|
+| 1 | `master` | XML-конфигурация, проверка параметров |
+| 2 | `step2` | прямые зависимости из PyPI |
+| 3 | `step3` | граф (рекурсивный DFS), фильтр, циклы, тестовый режим |
+| 4 | `step4` | порядок загрузки зависимостей, сравнение с pip |
+| 5 | `step5` | Mermaid, SVG, ASCII-дерево, сравнение с pipdeptree |
 
 ## Требования
 
@@ -21,7 +31,9 @@ src/main.py        точка входа CLI
 src/config.py      чтение и проверка XML-конфигурации
 src/pypi.py        получение прямых зависимостей из PyPI
 src/testrepo.py    чтение тестового репозитория
-src/graph.py       построение графа (рекурсивный DFS)
+src/graph.py       построение графа (рекурсивный DFS), порядок загрузки
+src/visualize.py   Mermaid, ASCII-дерево, SVG
+docs/              примеры SVG-изображений
 tests/             модульные тесты (unittest)
 repos/             тестовые репозитории
 scripts/errors/    конфигурации с ошибками для демонстрации
@@ -50,7 +62,7 @@ run.bat            запуск приложения и тестов
 | Параметр | Обязателен | Описание |
 |---|---|---|
 | `package` | да | Имя анализируемого пакета. В тестовом режиме — большие латинские буквы (`A`, `BC`). |
-| `repository` | да | URL репозитория (`http`/`https`) или путь к файлу тестового репозитория. Относительный путь считается от каталога конфигурации. |
+| `repository` | да | URL (`http`/`https`) или путь к тестовому репозиторию (от каталога конфигурации). |
 | `test_mode` | да | Режим работы с тестовым репозиторием: `true`/`false` (`yes`/`no`, `1`/`0`). |
 | `output_image` | да | Имя файла с изображением графа, расширение `.svg`, каталог должен существовать. |
 | `ascii_tree` | нет | Вывод зависимостей в виде ASCII-дерева: `true`/`false`, по умолчанию `false`. |
@@ -74,7 +86,9 @@ run.bat            запуск приложения и тестов
 Ошибки репозитория (пакет не найден, нет соединения, некорректный JSON,
 ошибка в файле тестового репозитория) выводятся как
 `Ошибка репозитория: ...`, код завершения `3`. Если корневой пакет
-исключён фильтром, выводится `Ошибка анализа: ...`, код `4`.
+исключён фильтром, выводится `Ошибка анализа: ...`, код `4`. Если не
+удалось записать файл изображения — `Ошибка сохранения изображения:
+...`, код `5`.
 
 ## Получение зависимостей
 
@@ -146,7 +160,11 @@ D:
 раз. В графе с циклом строгий порядок невозможен: цикл разрывается на
 ребре назад, и выводится предупреждение.
 
-Примеры на тестовом репозитории:
+По заданию порядок загрузки выводится только на этапе 4 (ветка
+`step4`). На этапе 5 вывод убран, а `load_order` используется для
+раскладки узлов на SVG-изображении.
+
+Примеры на тестовом репозитории (этап 4):
 
 | Граф | Порядок |
 |---|---|
@@ -162,10 +180,18 @@ D:
 (`pip install --target <временный каталог> <пакет>`, Python 3.14,
 Windows):
 
-| Пакет | Наша программа | pip |
-|---|---|---|
-| requests | charset-normalizer, idna, urllib3, certifi, requests | urllib3, idna, charset_normalizer, certifi, requests |
-| flask | blinker, click, zipp, importlib-metadata, itsdangerous, markupsafe, jinja2, werkzeug, flask | markupsafe, itsdangerous, click, blinker, werkzeug, jinja2, flask |
+```
+requests, наша программа:
+  charset-normalizer, idna, urllib3, certifi, requests
+requests, pip:
+  urllib3, idna, charset_normalizer, certifi, requests
+
+flask, наша программа:
+  blinker, click, zipp, importlib-metadata, itsdangerous, markupsafe,
+  jinja2, werkzeug, flask
+flask, pip:
+  markupsafe, itsdangerous, click, blinker, werkzeug, jinja2, flask
+```
 
 Расхождения и их причины:
 
@@ -185,6 +211,159 @@ Windows):
    зависимости у версий разные, состав графа может отличаться.
 4. **Циклы.** pip ставит пакеты из цикла вместе, а программа выводит
    предупреждение.
+
+## Визуализация
+
+При каждом запуске программа:
+
+1. выводит текстовое описание графа на языке **Mermaid** (`graph TD`).
+   Обычные рёбра обозначаются `-->`, рёбра, замыкающие цикл, — `-.->`;
+2. сохраняет изображение графа в **SVG** в файл `output_image`. SVG
+   строится без сторонних библиотек: узлы раскладываются по уровням
+   (уровень — длина самого длинного пути от корня), корень выделен
+   цветом, рёбра цикла нарисованы красной пунктирной дугой;
+3. если `ascii_tree=true`, выводит **ASCII-дерево** зависимостей. Общие
+   зависимости повторяются в каждой ветке (как в `pipdeptree`), а
+   возврат к пакету из текущей ветки помечается `(цикл)`.
+
+### Примеры для трёх пакетов
+
+**requests** (`scripts/examples/requests.xml`):
+
+```mermaid
+graph TD
+    n0["requests"]
+    n1["charset-normalizer"]
+    n2["idna"]
+    n3["urllib3"]
+    n4["certifi"]
+    n0 --> n1
+    n0 --> n2
+    n0 --> n3
+    n0 --> n4
+```
+
+![requests](docs/requests.svg)
+
+**flask** (`scripts/examples/flask.xml`):
+
+```mermaid
+graph TD
+    n0["flask"]
+    n1["blinker"]
+    n2["click"]
+    n3["importlib-metadata"]
+    n4["zipp"]
+    n5["itsdangerous"]
+    n6["jinja2"]
+    n7["markupsafe"]
+    n8["werkzeug"]
+    n0 --> n1
+    n0 --> n2
+    n0 --> n3
+    n0 --> n5
+    n0 --> n6
+    n0 --> n7
+    n0 --> n8
+    n3 --> n4
+    n6 --> n7
+    n8 --> n7
+```
+
+![flask](docs/flask.svg)
+
+**pandas** (`scripts/examples/pandas.xml`):
+
+```mermaid
+graph TD
+    n0["pandas"]
+    n1["numpy"]
+    n2["python-dateutil"]
+    n3["six"]
+    n4["tzdata"]
+    n0 --> n1
+    n0 --> n2
+    n0 --> n4
+    n2 --> n3
+    n2 --> n4
+```
+
+![pandas](docs/pandas.svg)
+
+Тестовый репозиторий с циклом B→C→E→B (`scripts/graphs/complex_cycle.xml`):
+
+```mermaid
+graph TD
+    n0["A"]
+    n1["B"]
+    n2["C"]
+    n3["E"]
+    n4["D"]
+    n0 --> n1
+    n0 --> n2
+    n1 --> n2
+    n1 --> n4
+    n2 --> n3
+    n3 -.-> n1
+    n4 --> n3
+```
+
+![cycle](docs/test_cycle.svg)
+
+Ещё один пример: `docs/test_diamond.svg` (`scripts/graphs/diamond.xml`).
+
+### Сравнение с pipdeptree
+
+Для сравнения в чистом виртуальном окружении (Python 3.14, Windows)
+установлены `requests`, `flask`, `pandas` и `pipdeptree`, затем
+выполнено `pipdeptree -p <пакет>`.
+
+```
+requests==2.34.2                        requests
+├── certifi                             ├── charset-normalizer
+├── charset-normalizer                  ├── idna
+├── idna                                ├── urllib3
+└── urllib3                             └── certifi
+
+Flask==3.1.3                            flask
+├── blinker                             ├── blinker
+├── click                               ├── click
+├── itsdangerous                        ├── importlib-metadata
+├── Jinja2                              │   └── zipp
+│   └── MarkupSafe                      ├── itsdangerous
+├── MarkupSafe                          ├── jinja2
+└── Werkzeug                            │   └── markupsafe
+    └── MarkupSafe                      ├── markupsafe
+                                        └── werkzeug
+                                            └── markupsafe
+
+pandas==3.1.0                           pandas
+├── numpy                               ├── numpy
+├── python-dateutil                     ├── python-dateutil
+│   ├── six                             │   ├── six
+│   └── tzdata                          │   └── tzdata
+└── tzdata                              └── tzdata
+```
+
+Слева pipdeptree (номера версий опущены), справа наша программа. Для
+requests и pandas состав графа совпадает. Расхождения:
+
+1. **`importlib-metadata` и `zipp` у flask.** pipdeptree показывает
+   только установленные пакеты, а pip не ставит `importlib-metadata` на
+   Python ≥ 3.10 (маркер `python_version < "3.10"`). Наша программа
+   маркеры окружения не вычисляет и показывает такую зависимость всегда.
+2. **Порядок детей.** pipdeptree сортирует зависимости по алфавиту, наша
+   программа выводит их в порядке `Requires-Dist`.
+3. **Имена.** pipdeptree показывает имя из метаданных (`Flask`,
+   `Jinja2`, `MarkupSafe`), а программа — каноническое имя PEP 503 в
+   нижнем регистре.
+4. **Версии.** pipdeptree показывает требуемую и установленную версию.
+   Программа анализирует последнюю версию каждого пакета на PyPI и
+   версии не выводит. Если требования к версиям исключают последнюю
+   версию, а её зависимости отличаются, графы тоже разойдутся.
+5. **Mermaid.** `pipdeptree --mermaid` строит похожую диаграмму
+   (`flowchart TD`), но с версиями в подписях и ограничениями версий на
+   рёбрах. Узлы и рёбра совпадают с нашими, кроме пункта 1.
 
 ## Функции
 
@@ -224,13 +403,22 @@ Windows):
 - `DependencyGraph.nodes()` / `dependencies(name)` — доступ к графу,
   `cycles` — найденные циклы.
 
+`src/visualize.py`:
+
+- `to_mermaid(graph)` — описание графа на языке Mermaid;
+- `ascii_tree(graph)` / `add_branches(...)` — ASCII-дерево;
+- `to_svg(graph)` / `save_svg(graph, path)` — SVG-изображение;
+- `assign_levels(graph)` / `layout(graph)` — раскладка узлов по уровням;
+- `svg_node`, `svg_edge`, `svg_marker`, `node_width` — элементы SVG;
+- `back_edges(graph)` — рёбра, замыкающие циклы.
+
 `src/main.py`:
 
 - `parse_args(argv)` — аргументы командной строки;
 - `make_source(config)` — источник зависимостей (PyPI или файл);
-- `print_graph(graph)` — вывод графа и циклов;
-- `print_load_order(graph)` — вывод порядка загрузки;
-- `run(config)` — построить граф и вывести граф и порядок загрузки;
+- `print_cycles(graph)` — вывод найденных циклов;
+- `visualize(graph, config)` — Mermaid, SVG и ASCII-дерево;
+- `run(config)` — построить граф и вывести его визуализацию;
 - `main(argv)` — запуск приложения, возвращает код завершения.
 
 ## Сборка и запуск
@@ -244,6 +432,7 @@ run.bat test                :: запуск тестов
 scripts\test_config.bat     :: демонстрация ошибок конфигурации
 scripts\test_deps.bat       :: графы для пакетов PyPI
 scripts\test_graphs.bat     :: все случаи тестового репозитория
+scripts\test_visual.bat     :: визуализация requests, flask, pandas
 ```
 
 Без `run.bat`:
@@ -256,58 +445,71 @@ python -m unittest discover -s tests -t . -v
 ## Примеры использования
 
 ```
-> run.bat scripts\examples\flask.xml
-Граф зависимостей пакета flask (пакетов: 9):
-  flask -> blinker, click, importlib-metadata, itsdangerous, jinja2, markupsafe, werkzeug
-  blinker -> (нет)
-  click -> (нет)
-  importlib-metadata -> zipp
-  zipp -> (нет)
-  itsdangerous -> (нет)
-  jinja2 -> markupsafe
-  markupsafe -> (нет)
-  werkzeug -> markupsafe
+> run.bat scripts\examples\requests.xml
+Граф зависимостей пакета requests на языке Mermaid:
+graph TD
+    n0["requests"]
+    n1["charset-normalizer"]
+    n2["idna"]
+    n3["urllib3"]
+    n4["certifi"]
+    n0 --> n1
+    n0 --> n2
+    n0 --> n3
+    n0 --> n4
 
-> run.bat scripts\examples\flask_filter.xml      :: filter_substring=importlib
-Граф зависимостей пакета flask (пакетов: 7):
-  flask -> blinker, click, itsdangerous, jinja2, markupsafe, werkzeug
-  ...
+Изображение сохранено в C:\...\Pr_2\docs\requests.svg
+
+requests
+├── charset-normalizer
+├── idna
+├── urllib3
+└── certifi
 
 > run.bat scripts\graphs\cycle.xml
-Граф зависимостей пакета A (пакетов: 4):
-  A -> B
-  B -> C
-  C -> A, D
-  D -> (нет)
+Граф зависимостей пакета A на языке Mermaid:
+graph TD
+    n0["A"]
+    n1["B"]
+    n2["C"]
+    n3["D"]
+    n0 --> n1
+    n1 --> n2
+    n2 -.-> n0
+    n2 --> n3
+
 Циклические зависимости:
   A -> B -> C -> A
 
-Порядок загрузки зависимостей пакета A:
-  1. D
-  2. C
-  3. B
-  4. A
-Внимание: из-за циклов часть пакетов загружается раньше своих зависимостей
+Изображение сохранено в C:\...\Pr_2\scripts\graphs\cycle.svg
 
-> run.bat scripts\graphs\diamond.xml
-...
-Порядок загрузки зависимостей пакета A:
-  1. F
-  2. D
-  3. B
-  4. E
-  5. C
-  6. A
+A
+└── B
+    └── C
+        ├── A (цикл)
+        └── D
 
-> run.bat scripts\graphs\filter_b.xml             :: filter_substring=B
-Граф зависимостей пакета A (пакетов: 3):
-  A -> C
-  C -> F
-  F -> (нет)
+> run.bat scripts\graphs\filter_b.xml        :: filter_substring=B
+Граф зависимостей пакета A на языке Mermaid:
+graph TD
+    n0["A"]
+    n1["C"]
+    n2["F"]
+    n0 --> n1
+    n1 --> n2
+
+Изображение сохранено в C:\...\Pr_2\scripts\graphs\filter_b.svg
+
+A
+└── C
+    └── F
 
 > run.bat scripts\graphs\filter_root.xml
 Ошибка анализа: пакет A исключён фильтром 'A'
 
-> run.bat scripts\graphs\bad_name.xml
-Ошибка репозитория: строка 2: недопустимое имя пакета 'c', нужны большие латинские буквы
+> run.bat scripts\examples\no-such-package-xyz.xml
+Ошибка репозитория: пакет 'no-such-package-xyz' не найден
+
+> run.bat scripts\errors\bad_output_image.xml
+Ошибка конфигурации: файл изображения должен иметь расширение .svg, получено 'graph.png'
 ```

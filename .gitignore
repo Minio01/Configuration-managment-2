@@ -12,3 +12,5 @@ dist/
 *.zip
 *.tar.gz
 *.pdf
+/*.svg
+scripts/**/*.svg

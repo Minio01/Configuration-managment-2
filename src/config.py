@@ -136,7 +136,7 @@ def check_repository(value, test_mode, base_dir):
             path = base_dir / path
         if not path.is_file():
             raise ConfigError(f"файл тестового репозитория не найден: {value}")
-        return str(path)
+        return str(path.resolve())
     url = urlparse(value)
     if url.scheme not in URL_SCHEMES or not url.netloc:
         raise ConfigError(
@@ -158,4 +158,4 @@ def check_output_image(value, base_dir):
         path = base_dir / path
     if not path.parent.is_dir():
         raise ConfigError(f"каталог для изображения не существует: {value}")
-    return str(path)
+    return str(path.resolve())

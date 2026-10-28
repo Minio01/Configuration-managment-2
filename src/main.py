@@ -7,12 +7,14 @@ from config import ConfigError, load_config
 from graph import GraphError, build_graph
 from pypi import RepositoryError, get_dependencies
 from testrepo import TestRepositoryError, load_repository
+from visualize import ascii_tree, save_svg, to_mermaid
 
 DEFAULT_CONFIG = "config.xml"
 EXIT_OK = 0
 EXIT_CONFIG_ERROR = 2
 EXIT_REPOSITORY_ERROR = 3
 EXIT_GRAPH_ERROR = 4
+EXIT_OUTPUT_ERROR = 5
 
 
 def parse_args(argv):
@@ -41,36 +43,33 @@ def make_source(config):
     return lambda name: get_dependencies(config.repository, name)
 
 
-def print_graph(graph):
-    """Вывести граф зависимостей в виде списка смежности."""
-    print(f"Граф зависимостей пакета {graph.root} "
-          f"(пакетов: {len(graph.edges)}):")
-    for name in graph.nodes():
-        deps = ", ".join(graph.dependencies(name)) or "(нет)"
-        print(f"  {name} -> {deps}")
+def print_cycles(graph):
+    """Вывести найденные циклические зависимости."""
     if graph.cycles:
         print("Циклические зависимости:")
         for cycle in graph.cycles:
             print("  " + " -> ".join(cycle))
+        print()
 
 
-def print_load_order(graph):
-    """Вывести порядок загрузки зависимостей пакета."""
-    print(f"Порядок загрузки зависимостей пакета {graph.root}:")
-    for number, name in enumerate(graph.load_order(), start=1):
-        print(f"  {number}. {name}")
-    if graph.cycles:
-        print("Внимание: из-за циклов часть пакетов загружается раньше "
-              "своих зависимостей")
+def visualize(graph, config):
+    """Вывести Mermaid, сохранить SVG и при необходимости ASCII-дерево."""
+    print(f"Граф зависимостей пакета {graph.root} на языке Mermaid:")
+    print(to_mermaid(graph))
+    print()
+    print_cycles(graph)
+    save_svg(graph, config.output_image)
+    print(f"Изображение сохранено в {config.output_image}")
+    if config.ascii_tree:
+        print()
+        print(ascii_tree(graph))
 
 
 def run(config):
-    """Построить граф по конфигурации и вывести результат."""
+    """Построить граф по конфигурации и вывести его визуализацию."""
     source = make_source(config)
     graph = build_graph(config.package, source, config.filter_substring)
-    print_graph(graph)
-    print()
-    print_load_order(graph)
+    visualize(graph, config)
 
 
 def main(argv=None):
@@ -89,6 +88,9 @@ def main(argv=None):
     except GraphError as exc:
         print(f"Ошибка анализа: {exc}", file=sys.stderr)
         return EXIT_GRAPH_ERROR
+    except OSError as exc:
+        print(f"Ошибка сохранения изображения: {exc}", file=sys.stderr)
+        return EXIT_OUTPUT_ERROR
     return EXIT_OK
 
 

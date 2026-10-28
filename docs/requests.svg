@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="496" height="168" viewBox="0 0 496 168" font-family="sans-serif" font-size="13">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#3b5b8c"/></marker><marker id="arrow-cycle" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#c0392b"/></marker></defs>
+<line x1="248.0" y1="52" x2="104.0" y2="116" stroke="#3b5b8c" marker-end="url(#arrow)"/>
+<line x1="248.0" y1="52" x2="240.0" y2="116" stroke="#3b5b8c" marker-end="url(#arrow)"/>
+<line x1="248.0" y1="52" x2="332.0" y2="116" stroke="#3b5b8c" marker-end="url(#arrow)"/>
+<line x1="248.0" y1="52" x2="436.0" y2="116" stroke="#3b5b8c" marker-end="url(#arrow)"/>
+<rect x="204.0" y="20" width="88" height="32" rx="6" fill="#c6dafc" stroke="#3b5b8c"/>
+<text x="248.0" y="41.0" text-anchor="middle">requests</text>
+<rect x="20.0" y="116" width="168" height="32" rx="6" fill="#e8f0fe" stroke="#3b5b8c"/>
+<text x="104.0" y="137.0" text-anchor="middle">charset-normalizer</text>
+<rect x="212.0" y="116" width="56" height="32" rx="6" fill="#e8f0fe" stroke="#3b5b8c"/>
+<text x="240.0" y="137.0" text-anchor="middle">idna</text>
+<rect x="292.0" y="116" width="80" height="32" rx="6" fill="#e8f0fe" stroke="#3b5b8c"/>
+<text x="332.0" y="137.0" text-anchor="middle">urllib3</text>
+<rect x="396.0" y="116" width="80" height="32" rx="6" fill="#e8f0fe" stroke="#3b5b8c"/>
+<text x="436.0" y="137.0" text-anchor="middle">certifi</text>
+</svg>
