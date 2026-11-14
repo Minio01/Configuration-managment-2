@@ -37,7 +37,7 @@ class TestModeTest(unittest.TestCase):
 
     def test_ascii_tree(self, _):
         _, out, _ = run_main(GRAPHS / "simple.xml")
-        self.assertIn("A\n├── B\n│   └── D\n└── C\n    └── D\n", out)
+        self.assertIn("A\n|-- B\n|   `-- D\n`-- C\n    `-- D\n", out)
 
     def test_ascii_tree_disabled(self, _):
         text = (ROOT / "config_test.xml").read_text(encoding="utf-8")
@@ -48,7 +48,7 @@ class TestModeTest(unittest.TestCase):
             path.write_text(text, encoding="utf-8")
             _, out, _ = run_main(path)
         self.assertIn("graph TD", out)
-        self.assertNotIn("├──", out)
+        self.assertNotIn("|--", out)
 
     def test_cycle_reported(self, _):
         _, out, _ = run_main(GRAPHS / "cycle.xml")
@@ -93,7 +93,7 @@ class PypiModeTest(unittest.TestCase):
         code, out, _ = run_main(ROOT / "config.xml")
         self.assertEqual(code, main.EXIT_OK)
         self.assertIn('n0["requests"]', out)
-        self.assertIn("requests\n├── idna\n└── certifi", out)
+        self.assertIn("requests\n|-- idna\n`-- certifi", out)
         self.assertEqual(get_dependencies.call_count, len(repo))
 
     @mock.patch("main.get_dependencies")

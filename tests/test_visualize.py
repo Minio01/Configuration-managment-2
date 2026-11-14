@@ -53,9 +53,9 @@ class AsciiTreeTest(unittest.TestCase):
         tree = ascii_tree(make_graph("A: B C\nB: D\nC:\nD:"))
         self.assertEqual(tree.splitlines(), [
             "A",
-            "├── B",
-            "│   └── D",
-            "└── C",
+            "|-- B",
+            "|   `-- D",
+            "`-- C",
         ])
 
     def test_shared_dependency_repeated(self):
@@ -64,11 +64,14 @@ class AsciiTreeTest(unittest.TestCase):
 
     def test_cycle_marked(self):
         tree = ascii_tree(make_graph("A: B\nB: A"))
-        self.assertEqual(tree.splitlines(), ["A", "└── B", "    └── A (цикл)"])
+        self.assertTrue(tree.isascii())
+        self.assertEqual(tree.splitlines(), [
+            "A", "`-- B", "    `-- A (cycle)",
+        ])
 
     def test_filtered(self):
         tree = ascii_tree(make_graph("A: B C\nB:\nC:", filter_substring="B"))
-        self.assertEqual(tree.splitlines(), ["A", "└── C"])
+        self.assertEqual(tree.splitlines(), ["A", "`-- C"])
 
 
 class SvgTest(unittest.TestCase):

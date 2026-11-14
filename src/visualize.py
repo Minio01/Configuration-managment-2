@@ -52,10 +52,10 @@ def add_branches(graph, name, prefix, lines, path=None):
     deps = graph.dependencies(name)
     for index, dep in enumerate(deps):
         last = index == len(deps) - 1
-        mark = " (цикл)" if dep in path else ""
-        lines.append(f"{prefix}{'└── ' if last else '├── '}{dep}{mark}")
+        mark = " (cycle)" if dep in path else ""
+        lines.append(f"{prefix}{'`-- ' if last else '|-- '}{dep}{mark}")
         if not mark:
-            child_prefix = prefix + ("    " if last else "│   ")
+            child_prefix = prefix + ("    " if last else "|   ")
             add_branches(graph, dep, child_prefix, lines, path)
 
 

@@ -17,7 +17,7 @@ CLI-приложение на Python для анализа зависимост�
 | 2 | `step2` | прямые зависимости из PyPI |
 | 3 | `step3` | граф (рекурсивный DFS), фильтр, циклы, тестовый режим |
 | 4 | `step4` | порядок загрузки зависимостей, сравнение с pip |
-| 5 | `step5` | Mermaid, SVG, ASCII-дерево, сравнение с pipdeptree |
+| 5 | `step5` | Mermaid, SVG, ASCII-дерево, сравнение с pip inspect |
 
 ## Требования
 
@@ -223,8 +223,8 @@ flask, pip:
    (уровень — длина самого длинного пути от корня), корень выделен
    цветом, рёбра цикла нарисованы красной пунктирной дугой;
 3. если `ascii_tree=true`, выводит **ASCII-дерево** зависимостей. Общие
-   зависимости повторяются в каждой ветке (как в `pipdeptree`), а
-   возврат к пакету из текущей ветки помечается `(цикл)`.
+   зависимости повторяются в каждой ветке, а
+   возврат к пакету из текущей ветки помечается `(cycle)`.
 
 ### Примеры для трёх пакетов
 
@@ -312,58 +312,43 @@ graph TD
 
 Ещё один пример: `docs/test_diamond.svg` (`scripts/graphs/diamond.xml`).
 
-### Сравнение с pipdeptree
+### Сравнение с `pip inspect`
 
-Для сравнения в чистом виртуальном окружении (Python 3.14, Windows)
-установлены `requests`, `flask`, `pandas` и `pipdeptree`, затем
-выполнено `pipdeptree -p <пакет>`.
+Штатная команда `pip inspect` выгружает JSON с версиями установленных
+пакетов, их требованиями `metadata.requires_dist` и параметрами среды
+`environment`. Для сравнения трёх примеров из этого раздела установите
+пакеты в отдельном окружении и получите отчёт:
 
-```
-requests==2.34.2                        requests
-├── certifi                             ├── charset-normalizer
-├── charset-normalizer                  ├── idna
-├── idna                                ├── urllib3
-└── urllib3                             └── certifi
-
-Flask==3.1.3                            flask
-├── blinker                             ├── blinker
-├── click                               ├── click
-├── itsdangerous                        ├── importlib-metadata
-├── Jinja2                              │   └── zipp
-│   └── MarkupSafe                      ├── itsdangerous
-├── MarkupSafe                          ├── jinja2
-└── Werkzeug                            │   └── markupsafe
-    └── MarkupSafe                      ├── markupsafe
-                                        └── werkzeug
-                                            └── markupsafe
-
-pandas==3.1.0                           pandas
-├── numpy                               ├── numpy
-├── python-dateutil                     ├── python-dateutil
-│   ├── six                             │   ├── six
-│   └── tzdata                          │   └── tzdata
-└── tzdata                              └── tzdata
+```bat
+py -m venv .venv
+.venv\Scripts\python.exe -m pip install --upgrade pip
+.venv\Scripts\python.exe -m pip install requests flask pandas
+.venv\Scripts\python.exe -m pip inspect --local > "%TEMP%\pr2-pip-inspect.json"
 ```
 
-Слева pipdeptree (номера версий опущены), справа наша программа. Для
-requests и pandas состав графа совпадает. Расхождения:
+В отчёте найдите корневой пакет в списке `installed`. Для каждой
+активной записи `requires_dist` найдите установленную зависимость и
+повторите обход. Сверяйте пары «пакет → зависимость» с рёбрами Mermaid
+или SVG. Учитывайте маркеры из `environment` и пустой `extra` для установки
+без дополнительных возможностей пакета.
 
-1. **`importlib-metadata` и `zipp` у flask.** pipdeptree показывает
-   только установленные пакеты, а pip не ставит `importlib-metadata` на
-   Python ≥ 3.10 (маркер `python_version < "3.10"`). Наша программа
-   маркеры окружения не вычисляет и показывает такую зависимость всегда.
-2. **Порядок детей.** pipdeptree сортирует зависимости по алфавиту, наша
-   программа выводит их в порядке `Requires-Dist`.
-3. **Имена.** pipdeptree показывает имя из метаданных (`Flask`,
-   `Jinja2`, `MarkupSafe`), а программа — каноническое имя PEP 503 в
-   нижнем регистре.
-4. **Версии.** pipdeptree показывает требуемую и установленную версию.
-   Программа анализирует последнюю версию каждого пакета на PyPI и
-   версии не выводит. Если требования к версиям исключают последнюю
-   версию, а её зависимости отличаются, графы тоже разойдутся.
-5. **Mermaid.** `pipdeptree --mermaid` строит похожую диаграмму
-   (`flowchart TD`), но с версиями в подписях и ограничениями версий на
-   рёбрах. Узлы и рёбра совпадают с нашими, кроме пункта 1.
+Контрольное сравнение на Windows (Python 3.12.14, pip 26.2.2)
+сопоставляет отчёт для установленного `pandas 3.0.1` с сохранённой выше
+визуализацией приложения:
+
+| Пакет | Активные зависимости по `pip inspect` | Рёбра на SVG |
+|---|---|---|
+| `pandas` | `numpy`, `python-dateutil`, `tzdata` | `numpy`, `python-dateutil`, `tzdata` |
+| `python-dateutil` | `tzdata` (в установленной версии 4.0.0) | `six`, `tzdata` |
+| `numpy`, `tzdata` | Нет | Нет |
+
+Ребро к `six` есть на сохранённой диаграмме, а метаданные установленного
+`python-dateutil 4.0.0` указывают только `tzdata`. Приложение строит граф
+по метаданным последних выпусков каждого пакета на PyPI. Отчёт pip
+описывает версии, установленные в конкретном окружении. Возможны
+различия из-за маркеров среды: например, приложение показывает ребро
+`flask → importlib-metadata` из сохранённого примера, а в Python 3.12
+условие `python_version < "3.10"` ложно.
 
 ## Функции
 
@@ -461,10 +446,10 @@ graph TD
 Изображение сохранено в C:\...\Pr_2\docs\requests.svg
 
 requests
-├── charset-normalizer
-├── idna
-├── urllib3
-└── certifi
+|-- charset-normalizer
+|-- idna
+|-- urllib3
+`-- certifi
 
 > run.bat scripts\graphs\cycle.xml
 Граф зависимостей пакета A на языке Mermaid:
@@ -484,10 +469,10 @@ graph TD
 Изображение сохранено в C:\...\Pr_2\scripts\graphs\cycle.svg
 
 A
-└── B
-    └── C
-        ├── A (цикл)
-        └── D
+`-- B
+    `-- C
+        |-- A (cycle)
+        `-- D
 
 > run.bat scripts\graphs\filter_b.xml        :: filter_substring=B
 Граф зависимостей пакета A на языке Mermaid:
@@ -501,8 +486,8 @@ graph TD
 Изображение сохранено в C:\...\Pr_2\scripts\graphs\filter_b.svg
 
 A
-└── C
-    └── F
+`-- C
+    `-- F
 
 > run.bat scripts\graphs\filter_root.xml
 Ошибка анализа: пакет A исключён фильтром 'A'
